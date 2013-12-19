@@ -81,11 +81,11 @@ let s:po_dom_3 = {
 let s:po_dom_funcs = { }
 
 function! s:po_dom_funcs.get_line(key)
-  if a:key !~# '^\(first\|last\)$'
+  if index([ 'first', 'last' ], a:key) == -1
     return 0
   endif
 
-  let ldict = eval('self.' . a:key)
+  let ldict = self[a:key]
   if has_key(ldict, 'number')
     return ldict.number
   elseif has_key(ldict, 'deferred')

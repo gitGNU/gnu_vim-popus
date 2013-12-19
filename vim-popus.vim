@@ -81,7 +81,7 @@ let s:po_dom_3 = {
 let s:po_dom_funcs = { }
 
 function! s:po_dom_funcs.get_line(key)
-  if index([ 'first', 'last' ], a:key) == -1
+  if a:key !=# 'first' && a:key !=# 'last'
     return 0
   endif
 

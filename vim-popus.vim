@@ -153,7 +153,7 @@ let s:lt_pre_cmt = {
 let s:lt_msg_tr_cmt = {}
 
 " A line matching '^\s*#\(\s\+.\+\)*$' could be of 's:tr_cmt' or 's:pre_cmt' type.
-let s:lt_cmt = {
+let s:lt_mlt_cmt = {
       \  'desc': "Comment -> "
       \, 'patt': '^\s*#\(\s\+.\+\)*$'
       \, 'patt_props': { 'def_self':'true' }
@@ -249,7 +249,7 @@ let s:lt_header_entry_cont = {
 " empty lines, and another valid element type (as ceiling) above it.
 let s:lt_msg_tr_cmt = {
       \  'desc': "Translator comment"
-      \, 'patt': '^\%(' . s:lt_cmt.patt . '\|\s*$\)\@!'
+      \, 'patt': '^\%(' . s:lt_mlt_cmt.patt . '\|\s*$\)\@!'
       \, 'patt_props': { 'def_self':'false', 'is':'ceiling' }
       \}
 
@@ -323,7 +323,7 @@ let s:lt_msg_cont = {
 
 " Elements: {{{
 
-let s:misc_elements = [ s:lt_pre_cmt, s:lt_cmt ]
+let s:misc_elements = [ s:lt_pre_cmt, s:lt_mlt_cmt ]
 
 let s:header_entry_elements = [
       \  s:lt_hd_prid

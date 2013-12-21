@@ -55,15 +55,21 @@
 " PO files parsing {{{
 
 " Domains: {{{
+" A PO file is composed of 3 'domains' :
+" 1. preamble comments (optional)
+"    followed by
+" 2. header entries
+"    followed by
+" 3. messages.
 " To help disambiguation when a line type can not be identified without
-" context information, we define 3 domains and a function which returns
+" context information, we define those 3 domains and a function which returns
 " a list with first/last lines of each domain.
 
 let s:po_dom_1 = {
       \  'name' : "preamble_comment_domain"
       \, 'first': { 'number': 0 }
       \, 'last' : { 'pattern': '\n\_^\s*msgid\s\+""\s*\(\n\s*\)*\_^*\s*msgstr\s\+""\s*$' }
-      \, 'comment': "Optional, might be from 0 to 0"
+      \, 'comment': "This domain could be empty (get_line would return 0 for first and last)"
       \}
 
 let s:po_dom_2 = {
@@ -104,10 +110,10 @@ function! s:po_dom_funcs.get_line(key)
     let search_from = 1
   endif
 
-  let save_cursor = getpos('.')
+  let saved_cursor = getpos('.')
   call cursor(search_from, 1)
   let fret = search(ldict.pattern, search_flags)
-  call cursor(save_cursor[1], save_cursor[2])
+  call cursor(saved_cursor[1], saved_cursor[2])
   return fret
 endfunction
 

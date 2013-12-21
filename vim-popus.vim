@@ -55,7 +55,7 @@
 " PO files parsing {{{
 
 " Domains: {{{
-" A PO file is composed of 3 'domains' :
+" A PO file is composed of 3 "domains" :
 " 1. preamble comments (optional)
 "    followed by
 " 2. header entries
@@ -143,21 +143,21 @@ endfunction
 
 " A preamble comment line has nothing else than other comments, empty lines,
 " and begining of file (as ceiling) above it.
-let s:pre_cmt = {
+let s:lt_pre_cmt = {
       \  'desc': "Preamble comment"
       \, 'patt': '\%^'
       \, 'patt_props': { 'def_self':'false', 'is':'ceiling' }
       \}
 
 " Just init 's:tr_cmt' here because of cross-ref with 's:cmt'. Realy defined later.
-let s:tr_cmt = {}
+let s:lt_msg_tr_cmt = {}
 
 " A line matching '^\s*#\(\s\+.\+\)*$' could be of 's:tr_cmt' or 's:pre_cmt' type.
-let s:cmt = {
+let s:lt_cmt = {
       \  'desc': "Comment -> "
       \, 'patt': '^\s*#\(\s\+.\+\)*$'
       \, 'patt_props': { 'def_self':'true' }
-      \, 'could_be': [ s:pre_cmt, s:tr_cmt ]
+      \, 'could_be': [ s:lt_pre_cmt, s:lt_msg_tr_cmt ]
       \}
 
 "}}}
@@ -166,73 +166,73 @@ let s:cmt = {
 
 " TODO : complete header entries list
 
-let s:prid = {
+let s:lt_hd_prid = {
       \  'desc': "Project-Id-Version"
       \, 'patt': '^\s*"Project-Id-Version\s*:\s*\(.*\)\s*"$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:potdate = {
+let s:lt_hd_potdate = {
       \  'desc': "POT-Creation-Date"
       \, 'patt': '^\s*"POT-Creation-Date\s*:\s*\(.*\)\s*"$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:porevdate = {
+let s:lt_hd_porevdate = {
       \  'desc': "PO-Revision-Date"
       \, 'patt': '^\s*"PO-Revision-Date\s*:\s*\(.*\)\s*"$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:last_tr = {
+let s:lt_hd_last_tr = {
       \  'desc': "Last-Translator"
       \, 'patt': '^\s*"Last-Translator\s*:\s*\(.*\)\s*"$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:lang_team = {
+let s:lt_hd_lang_team = {
       \  'desc': "Language-Team"
       \, 'patt': '^\s*"Language-Team\s*:\s*\(.*\)\s*"$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:language = {
+let s:lt_hd_language = {
       \  'desc': "Language"
       \, 'patt': '^\s*"Language\s*:\s*\(.*\)\s*"$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:mimev = {
+let s:lt_hd_mimev = {
       \  'desc': "MIME-Version"
       \, 'patt': '^\s*"MIME-Version\s*:\s*\(.*\)\s*"$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:ctype = {
+let s:lt_hd_ctype = {
       \  'desc': "Content-Type"
       \, 'patt': '^\s*"Content-Type\s*:\s*\(.*\)\s*"$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:tenc = {
+let s:lt_hd_tenc = {
       \  'desc': "Content-Transfer-Encoding"
       \, 'patt': '^\s*"Content-Transfer-Encoding\s*:\s*\(.*\)\s*"$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:xgen = {
+let s:lt_hd_xgen = {
       \  'desc': "X-Generator"
       \, 'patt': '^\s*"X-Generator\s*:\s*\(.*\)\s*"$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:plurf = {
+let s:lt_hd_plurf = {
       \  'desc': "Plural-Forms"
       \, 'patt': '^\s*"Plural-Forms\s*:\s*\(.*\)\s*"$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:header_entry_cont = {
+let s:lt_header_entry_cont = {
       \  'desc': "Continuation line of header entry -> "
       \, 'patt': '^\s*"\(.*\)\\n"\s*$'
       \, 'patt_props': { 'def_self':'true' }
@@ -247,72 +247,72 @@ let s:header_entry_cont = {
 
 " A Translator comment line has nothing else than other comments,
 " empty lines, and another valid element type (as ceiling) above it.
-let s:tr_cmt = {
+let s:lt_msg_tr_cmt = {
       \  'desc': "Translator comment"
-      \, 'patt': '^\%(' . s:cmt.patt . '\|\s*$\)\@!'
+      \, 'patt': '^\%(' . s:lt_cmt.patt . '\|\s*$\)\@!'
       \, 'patt_props': { 'def_self':'false', 'is':'ceiling' }
       \}
 
-let s:xt_cmt = {
+let s:lt_msg_xt_cmt = {
       \  'desc': "Extracted comment"
       \, 'patt': '^\s*#\.\s\+\(.*\)$'
       \, 'patt_props': { 'def_self':'true' }
       \}
 
-let s:ref = {
+let s:lt_msg_ref = {
       \  'desc': "Reference"
       \, 'patt': '^\s*#:\s\+\(.*\)$'
       \, 'patt_props': { 'def_self':'true' }
       \}
 
-let s:flags = {
+let s:lt_msg_flags = {
       \  'desc': "Flags"
       \, 'patt': '^\s*#\(,\s\+\(.*\)\)\+$'
       \, 'patt_props': { 'def_self':'true' }
       \}
 
-let s:prv_ctxt = {
+let s:lt_msg_prv_ctxt = {
       \  'desc': "Previous context"
       \, 'patt': '^\s*#|\s\+msgctxt\s\+\"\(.*\)"\s*$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:prv_us = {
+let s:lt_msg_prv_us = {
       \  'desc': "Previous untranslated string"
       \, 'patt': '^\s*#|\s\+msgid\s\+\"\(.*\)"\s*$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:prv_cont = {
+let s:lt_msg_prv_cont = {
       \  'desc': "Continuation line of -> "
       \, 'patt': '^\s*#|\s\+"\(.*\)"\s*$'
       \, 'patt_props': { 'def_self':'true' }
-      \, 'could_be': [ s:prv_ctxt, s:prv_us ]
+      \, 'could_be': [ s:lt_msg_prv_ctxt, s:lt_msg_prv_us ]
       \}
 
-let s:ctxt = {
+let s:lt_msg_ctxt = {
       \  'desc': "Message context"
       \, 'patt': '^\s*msgctxt\s\+\"\(.*\)"\s*$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:ustr = {
+let s:lt_msg_ustr = {
       \  'desc': "Untranslated string"
       \, 'patt': '^\s*msgid\s\+\"\(.*\)"\s*$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:trstr = {
+let s:lt_msg_trstr = {
       \  'desc': "Translated string"
       \, 'patt': '^\s*msgstr\s\+\"\(.*\)"\s*$'
       \, 'patt_props': { 'def_self':'true', 'is':'top' }
       \}
 
-let s:cont = {
+let s:lt_msg_cont = {
       \  'desc': "Continuation line of -> "
       \, 'patt': '^\s*".*"\s*$'
       \, 'patt_props': { 'def_self':'true' }
-      \, 'could_be': [ s:ctxt, s:ustr, s:trstr ]
+      \, 'could_be': [ s:lt_msg_ctxt, s:lt_msg_ustr, s:lt_msg_trstr ]
       \}
 
 "}}}
@@ -323,34 +323,34 @@ let s:cont = {
 
 " Elements: {{{
 
-let s:misc_elements = [ s:pre_cmt, s:cmt ]
+let s:misc_elements = [ s:lt_pre_cmt, s:lt_cmt ]
 
 let s:header_entry_elements = [
-      \  s:prid
-      \, s:potdate
-      \, s:porevdate
-      \, s:last_tr
-      \, s:lang_team
-      \, s:language
-      \, s:mimev
-      \, s:ctype
-      \, s:tenc
-      \, s:xgen
-      \, s:plurf
+      \  s:lt_hd_prid
+      \, s:lt_hd_potdate
+      \, s:lt_hd_porevdate
+      \, s:lt_hd_last_tr
+      \, s:lt_hd_lang_team
+      \, s:lt_hd_language
+      \, s:lt_hd_mimev
+      \, s:lt_hd_ctype
+      \, s:lt_hd_tenc
+      \, s:lt_hd_xgen
+      \, s:lt_hd_plurf
       \]
 
 let s:msg_entry_elements = [
-      \  s:tr_cmt
-      \, s:xt_cmt
-      \, s:ref
-      \, s:flags
-      \, s:prv_ctxt
-      \, s:prv_us
-      \, s:prv_cont
-      \, s:ctxt
-      \, s:ustr
-      \, s:trstr
-      \, s:cont
+      \  s:lt_msg_tr_cmt
+      \, s:lt_msg_xt_cmt
+      \, s:lt_msg_ref
+      \, s:lt_msg_flags
+      \, s:lt_msg_prv_ctxt
+      \, s:lt_msg_prv_us
+      \, s:lt_msg_prv_cont
+      \, s:lt_msg_ctxt
+      \, s:lt_msg_ustr
+      \, s:lt_msg_trstr
+      \, s:lt_msg_cont
       \]
 
 let s:po_files_entries =

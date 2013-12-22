@@ -62,31 +62,30 @@
 "    followed by
 " 3. messages.
 " To help disambiguation when a line type can not be identified without
-" context information, we define those 3 domains and a function which returns
-" a list with first/last lines of each domain.
+" context information, we define those 3 domains and related functions.
 
-let s:po_dom_1 = {
+let s:po_dom_pre = {
       \  'name' : "preamble_comment_domain"
       \, 'first': { 'number': 0 }
       \, 'last' : { 'pattern': '\n\_^\s*msgid\s\+""\s*\(\n\s*\)*\_^*\s*msgstr\s\+""\s*$' }
       \, 'comment': "This domain could be empty (get_line would return 0 for first and last)"
       \}
 
-let s:po_dom_2 = {
+let s:po_dom_head = {
       \  'name'  : "header_domain"
-      \, 'first' : { 'deferred': "s:po_dom_1.get_line('last') + 1" }
+      \, 'first' : { 'deferred': "s:po_dom_pre.get_line('last') + 1" }
       \, 'last'  : { 'pattern': '\n\_^\s*\(#\|msgid\s\+".*"\).*$' }
       \}
 
-let s:po_dom_3 = {
+let s:po_dom_msgs = {
       \  'name'  : "messages_domain"
-      \, 'first' : { 'deferred': "s:po_dom_2.get_line('last') + 1" }
+      \, 'first' : { 'deferred': "s:po_dom_head.get_line('last') + 1" }
       \, 'last'  : { 'pattern': '\%$' }
       \}
 
-let s:po_dom_funcs = { }
+let s:po_dom_funcs = {}
 
-function! s:po_dom_funcs.get_line(key)
+function! s:po_dom_funcs.get_line(key) " {{{
   if a:key !=# 'first' && a:key !=# 'last'
     return 0
   endif
@@ -112,41 +111,39 @@ function! s:po_dom_funcs.get_line(key)
 
   let saved_cursor = getpos('.')
   call cursor(search_from, 1)
-  let fret = search(ldict.pattern, search_flags)
+  let fret = search('\m' . ldict.pattern, search_flags)
   call cursor(saved_cursor[1], saved_cursor[2])
   return fret
-endfunction
+endfunction " }}}
 
-let s:sorted_domains = [ s:po_dom_1, s:po_dom_2, s:po_dom_3 ]
+let s:sorted_domains = [ s:po_dom_pre, s:po_dom_head, s:po_dom_msgs ]
 
 for dom in s:sorted_domains
   let dom.get_line = s:po_dom_funcs.get_line
 endfor
 
-function! Get_po_doms()
-  let fret = []
+function! Get_dom_on_line(line_number)
   for dom in s:sorted_domains
-    let fret += [ {
-          \  'name'      : dom.name
-          \, 'first_line': dom.get_line('first')
-          \, 'last_line' : dom.get_line('last')
-          \} ]
+    if a:line_number >= dom.get_line('first')
+      if a:line_number <= dom.get_line('last')
+        return dom
+      endif
+    endif
   endfor
-  return fret
 endfunction
 
 " }}}
 
 " Type idenfication line-wise: {{{
 
-" Misc entries line type identification: {{{
+" Line types definitions: {{{
 
-" A preamble comment line has nothing else than other comments, empty lines,
-" and begining of file (as ceiling) above it.
+" Misc entries line type definitions: {{{
+
 let s:lt_pre_cmt = {
       \  'desc': "Preamble comment"
-      \, 'patt': '\%^'
-      \, 'patt_props': { 'def_self':'false', 'is':'ceiling' }
+      \, 'pattern': '\m\(^\(\s*#.*\)\s*$\)'
+      \, 'domain': s:po_dom_pre
       \}
 
 " Just init 's:tr_cmt' here because of cross-ref with 's:cmt'. Realy defined later.
@@ -155,178 +152,171 @@ let s:lt_msg_tr_cmt = {}
 " A line matching '^\s*#\(\s\+.\+\)*$' could be of 's:tr_cmt' or 's:pre_cmt' type.
 let s:lt_mlt_cmt = {
       \  'desc': "Comment -> "
-      \, 'patt': '^\s*#\(\s\+.\+\)*$'
+      \, 'pattern': '^\s*#\(\s\+.\+\)*$'
       \, 'patt_props': { 'def_self':'true' }
       \, 'could_be': [ s:lt_pre_cmt, s:lt_msg_tr_cmt ]
       \}
 
 "}}}
 
-" Header entry line type identification: {{{
+" Header entry line type definitions: {{{
 
 " TODO : complete header entries list
 
 let s:lt_hd_prid = {
       \  'desc': "Project-Id-Version"
-      \, 'patt': '^\s*"Project-Id-Version\s*:\s*\(.*\)\s*"$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*"Project-Id-Version\s*:\s*\(.*\)\s*"$'
+      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_potdate = {
       \  'desc': "POT-Creation-Date"
-      \, 'patt': '^\s*"POT-Creation-Date\s*:\s*\(.*\)\s*"$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*"POT-Creation-Date\s*:\s*\(.*\)\s*"$'
+      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_porevdate = {
       \  'desc': "PO-Revision-Date"
-      \, 'patt': '^\s*"PO-Revision-Date\s*:\s*\(.*\)\s*"$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*"PO-Revision-Date\s*:\s*\(.*\)\s*"$'
+      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_last_tr = {
       \  'desc': "Last-Translator"
-      \, 'patt': '^\s*"Last-Translator\s*:\s*\(.*\)\s*"$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*"Last-Translator\s*:\s*\(.*\)\s*"$'
+      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_lang_team = {
       \  'desc': "Language-Team"
-      \, 'patt': '^\s*"Language-Team\s*:\s*\(.*\)\s*"$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*"Language-Team\s*:\s*\(.*\)\s*"$'
+      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_language = {
       \  'desc': "Language"
-      \, 'patt': '^\s*"Language\s*:\s*\(.*\)\s*"$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*"Language\s*:\s*\(.*\)\s*"$'
+      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_mimev = {
       \  'desc': "MIME-Version"
-      \, 'patt': '^\s*"MIME-Version\s*:\s*\(.*\)\s*"$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*"MIME-Version\s*:\s*\(.*\)\s*"$'
+      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_ctype = {
       \  'desc': "Content-Type"
-      \, 'patt': '^\s*"Content-Type\s*:\s*\(.*\)\s*"$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*"Content-Type\s*:\s*\(.*\)\s*"$'
+      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_tenc = {
       \  'desc': "Content-Transfer-Encoding"
-      \, 'patt': '^\s*"Content-Transfer-Encoding\s*:\s*\(.*\)\s*"$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*"Content-Transfer-Encoding\s*:\s*\(.*\)\s*"$'
+      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_xgen = {
       \  'desc': "X-Generator"
-      \, 'patt': '^\s*"X-Generator\s*:\s*\(.*\)\s*"$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*"X-Generator\s*:\s*\(.*\)\s*"$'
+      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_plurf = {
       \  'desc': "Plural-Forms"
-      \, 'patt': '^\s*"Plural-Forms\s*:\s*\(.*\)\s*"$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*"Plural-Forms\s*:\s*\(.*\)\s*"$'
+      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_header_entry_cont = {
       \  'desc': "Continuation line of header entry -> "
-      \, 'patt': '^\s*"\(.*\)\\n"\s*$'
+      \, 'pattern': '^\s*"\(.*\)\\n"\s*$'
       \, 'patt_props': { 'def_self':'true' }
-      \, 'could_be': s:header_entry_elements
       \}
 
 " }}}
 
-" Message entry line type identification: {{{
+" Message entry line type definitions: {{{
 
 " TODO : add compendium duplicated entries support.
 
-" A Translator comment line has nothing else than other comments,
-" empty lines, and another valid element type (as ceiling) above it.
 let s:lt_msg_tr_cmt = {
       \  'desc': "Translator comment"
-      \, 'patt': '^\%(' . s:lt_mlt_cmt.patt . '\|\s*$\)\@!'
-      \, 'patt_props': { 'def_self':'false', 'is':'ceiling' }
+      \, 'pattern': '\m^\s*#\s\+.*$'
+      \, 'domain': s:po_dom_msgs
       \}
 
 let s:lt_msg_xt_cmt = {
       \  'desc': "Extracted comment"
-      \, 'patt': '^\s*#\.\s\+\(.*\)$'
-      \, 'patt_props': { 'def_self':'true' }
+      \, 'pattern': '^\s*#\.\s\+\(.*\)$'
+      \, 'domain': s:po_dom_msgs
       \}
 
 let s:lt_msg_ref = {
       \  'desc': "Reference"
-      \, 'patt': '^\s*#:\s\+\(.*\)$'
-      \, 'patt_props': { 'def_self':'true' }
+      \, 'pattern': '^\s*#:\s\+\(.*\)$'
+      \, 'domain': s:po_dom_msgs
       \}
 
 let s:lt_msg_flags = {
       \  'desc': "Flags"
-      \, 'patt': '^\s*#\(,\s\+\(.*\)\)\+$'
-      \, 'patt_props': { 'def_self':'true' }
+      \, 'pattern': '^\s*#\(,\s\+\(.*\)\)\+$'
+      \, 'domain': s:po_dom_msgs
       \}
 
 let s:lt_msg_prv_ctxt = {
       \  'desc': "Previous context"
-      \, 'patt': '^\s*#|\s\+msgctxt\s\+\"\(.*\)"\s*$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*#|\s\+msgctxt\s\+\"\(.*\)"\s*$'
+      \, 'domain': s:po_dom_msgs
       \}
 
 let s:lt_msg_prv_us = {
       \  'desc': "Previous untranslated string"
-      \, 'patt': '^\s*#|\s\+msgid\s\+\"\(.*\)"\s*$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*#|\s\+msgid\s\+\"\(.*\)"\s*$'
+      \, 'domain': s:po_dom_msgs
       \}
 
 let s:lt_msg_prv_cont = {
       \  'desc': "Continuation line of -> "
-      \, 'patt': '^\s*#|\s\+"\(.*\)"\s*$'
-      \, 'patt_props': { 'def_self':'true' }
+      \, 'pattern': '^\s*#|\s\+"\(.*\)"\s*$'
+      \, 'domain': s:po_dom_msgs
       \, 'could_be': [ s:lt_msg_prv_ctxt, s:lt_msg_prv_us ]
       \}
 
 let s:lt_msg_ctxt = {
       \  'desc': "Message context"
-      \, 'patt': '^\s*msgctxt\s\+\"\(.*\)"\s*$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*msgctxt\s\+\"\(.*\)"\s*$'
+      \, 'domain': s:po_dom_msgs
       \}
 
 let s:lt_msg_ustr = {
       \  'desc': "Untranslated string"
-      \, 'patt': '^\s*msgid\s\+\"\(.*\)"\s*$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*msgid\s\+\"\(.*\)"\s*$'
+      \, 'domain': s:po_dom_msgs
       \}
 
 let s:lt_msg_trstr = {
       \  'desc': "Translated string"
-      \, 'patt': '^\s*msgstr\s\+\"\(.*\)"\s*$'
-      \, 'patt_props': { 'def_self':'true', 'is':'top' }
+      \, 'pattern': '^\s*msgstr\s\+\"\(.*\)"\s*$'
+      \, 'domain': s:po_dom_msgs
       \}
 
 let s:lt_msg_cont = {
       \  'desc': "Continuation line of -> "
-      \, 'patt': '^\s*".*"\s*$'
-      \, 'patt_props': { 'def_self':'true' }
+      \, 'pattern': '^\s*".*"\s*$'
+      \, 'domain': s:po_dom_msgs
       \, 'could_be': [ s:lt_msg_ctxt, s:lt_msg_ustr, s:lt_msg_trstr ]
       \}
 
-"}}}
+" }}}
 
 " }}}
 
-" PO files structure {{{
-
-" Elements: {{{
-
-let s:misc_elements = [ s:lt_pre_cmt, s:lt_mlt_cmt ]
-
-let s:header_entry_elements = [
-      \  s:lt_hd_prid
+" Line type identification: {{{
+let s:line_types = [
+      \  s:lt_pre_cmt
+      \, s:lt_hd_prid
       \, s:lt_hd_potdate
       \, s:lt_hd_porevdate
       \, s:lt_hd_last_tr
@@ -337,62 +327,45 @@ let s:header_entry_elements = [
       \, s:lt_hd_tenc
       \, s:lt_hd_xgen
       \, s:lt_hd_plurf
-      \]
-
-let s:msg_entry_elements = [
-      \  s:lt_msg_tr_cmt
+      \, s:lt_msg_tr_cmt
+      \, s:lt_msg_tr_cmt
       \, s:lt_msg_xt_cmt
       \, s:lt_msg_ref
       \, s:lt_msg_flags
       \, s:lt_msg_prv_ctxt
       \, s:lt_msg_prv_us
-      \, s:lt_msg_prv_cont
       \, s:lt_msg_ctxt
       \, s:lt_msg_ustr
       \, s:lt_msg_trstr
-      \, s:lt_msg_cont
       \]
 
-let s:po_files_entries =
-      \  s:misc_elements
-      \+ s:header_entry_elements
-      \+ s:msg_entry_elements
+let s:lt_funcs = {}
 
-" TODO : généraliser
-function! Line_match_list()
-  let l:list = []
-  for elem in s:po_files_entries
-    if elem.patt_props.def_self  ==# 'true'
-      call add(l:list, elem)
-    endif
-  endfor
-  return l:list
+function! s:lt_funcs.match_me(line_number)
+  if match(getline(a:line_number), self.pattern) == -1
+    return {}
+  endif
+  return self
 endfunction
 
-let s:line_match_list = Line_match_list()
+for lt in s:line_types
+  let lt.match_me = s:lt_funcs.match_me
+endfor
 
-"}}}
-
+function! Get_line_type(line_number)
+  let dom = Get_dom_on_line(a:line_number)
+  let list = filter(copy(s:line_types), "v:val.domain is dom")
+  for lt in list
+    if !empty(lt.match_me(a:line_number))
+      return lt
+    endif
+  endfor
+  return {}
+endfunction
 
 " }}}
 
 " }}}
-
-" Bordel/tests {{{
-
-function! Det_line_type(...)
-  let l:wline = getline(a:0 == 0 ? '.' : a:1)
-  for elem in s:line_match_list
-    if match(l:wline, elem.patt) > -1
-      let l:retstr = elem.desc
-      if has_key(elem, 'could_be')
-        let l:retstr .= "TODO : function to return 'parent' type"
-      endif
-      return l:retstr
-    endif
-  endfor
-  return "Unable to parse type of line"
-endfunction
 
 " }}}
 
@@ -413,5 +386,6 @@ function! Clean_psh()
 endfunction
 
 " }}}
+
 
 " { vim: set foldmethod=marker : zM }

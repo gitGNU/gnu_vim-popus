@@ -143,7 +143,6 @@ endfunction
 let s:lt_pre_cmt = {
       \  'desc': "Preamble comment"
       \, 'pattern': '\m\(^\(\s*#.*\)\s*$\)'
-      \, 'domain': s:po_dom_pre
       \}
 
 " Just init 's:tr_cmt' here because of cross-ref with 's:cmt'. Realy defined later.
@@ -157,6 +156,12 @@ let s:lt_mlt_cmt = {
       \, 'could_be': [ s:lt_pre_cmt, s:lt_msg_tr_cmt ]
       \}
 
+let s:lt_pres = [ s:lt_pre_cmt ]
+
+for lt_pre in s:lt_pres
+  let lt_pre.domain = s:po_dom_pre
+endfor
+
 "}}}
 
 " Header entry line type definitions: {{{
@@ -166,67 +171,56 @@ let s:lt_mlt_cmt = {
 let s:lt_hd_prid = {
       \  'desc': "Project-Id-Version"
       \, 'pattern': '^\s*"Project-Id-Version\s*:\s*\(.*\)\s*"$'
-      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_potdate = {
       \  'desc': "POT-Creation-Date"
       \, 'pattern': '^\s*"POT-Creation-Date\s*:\s*\(.*\)\s*"$'
-      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_porevdate = {
       \  'desc': "PO-Revision-Date"
       \, 'pattern': '^\s*"PO-Revision-Date\s*:\s*\(.*\)\s*"$'
-      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_last_tr = {
       \  'desc': "Last-Translator"
       \, 'pattern': '^\s*"Last-Translator\s*:\s*\(.*\)\s*"$'
-      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_lang_team = {
       \  'desc': "Language-Team"
       \, 'pattern': '^\s*"Language-Team\s*:\s*\(.*\)\s*"$'
-      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_language = {
       \  'desc': "Language"
       \, 'pattern': '^\s*"Language\s*:\s*\(.*\)\s*"$'
-      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_mimev = {
       \  'desc': "MIME-Version"
       \, 'pattern': '^\s*"MIME-Version\s*:\s*\(.*\)\s*"$'
-      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_ctype = {
       \  'desc': "Content-Type"
       \, 'pattern': '^\s*"Content-Type\s*:\s*\(.*\)\s*"$'
-      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_tenc = {
       \  'desc': "Content-Transfer-Encoding"
       \, 'pattern': '^\s*"Content-Transfer-Encoding\s*:\s*\(.*\)\s*"$'
-      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_xgen = {
       \  'desc': "X-Generator"
       \, 'pattern': '^\s*"X-Generator\s*:\s*\(.*\)\s*"$'
-      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_hd_plurf = {
       \  'desc': "Plural-Forms"
       \, 'pattern': '^\s*"Plural-Forms\s*:\s*\(.*\)\s*"$'
-      \, 'domain': s:po_dom_head
       \}
 
 let s:lt_header_entry_cont = {
@@ -235,88 +229,8 @@ let s:lt_header_entry_cont = {
       \, 'patt_props': { 'def_self':'true' }
       \}
 
-" }}}
-
-" Message entry line type definitions: {{{
-
-" TODO : add compendium duplicated entries support.
-
-let s:lt_msg_tr_cmt = {
-      \  'desc': "Translator comment"
-      \, 'pattern': '\m^\s*#\s\+.*$'
-      \, 'domain': s:po_dom_msgs
-      \}
-
-let s:lt_msg_xt_cmt = {
-      \  'desc': "Extracted comment"
-      \, 'pattern': '^\s*#\.\s\+\(.*\)$'
-      \, 'domain': s:po_dom_msgs
-      \}
-
-let s:lt_msg_ref = {
-      \  'desc': "Reference"
-      \, 'pattern': '^\s*#:\s\+\(.*\)$'
-      \, 'domain': s:po_dom_msgs
-      \}
-
-let s:lt_msg_flags = {
-      \  'desc': "Flags"
-      \, 'pattern': '^\s*#\(,\s\+\(.*\)\)\+$'
-      \, 'domain': s:po_dom_msgs
-      \}
-
-let s:lt_msg_prv_ctxt = {
-      \  'desc': "Previous context"
-      \, 'pattern': '^\s*#|\s\+msgctxt\s\+\"\(.*\)"\s*$'
-      \, 'domain': s:po_dom_msgs
-      \}
-
-let s:lt_msg_prv_us = {
-      \  'desc': "Previous untranslated string"
-      \, 'pattern': '^\s*#|\s\+msgid\s\+\"\(.*\)"\s*$'
-      \, 'domain': s:po_dom_msgs
-      \}
-
-let s:lt_msg_prv_cont = {
-      \  'desc': "Continuation line of -> "
-      \, 'pattern': '^\s*#|\s\+"\(.*\)"\s*$'
-      \, 'domain': s:po_dom_msgs
-      \, 'could_be': [ s:lt_msg_prv_ctxt, s:lt_msg_prv_us ]
-      \}
-
-let s:lt_msg_ctxt = {
-      \  'desc': "Message context"
-      \, 'pattern': '^\s*msgctxt\s\+\"\(.*\)"\s*$'
-      \, 'domain': s:po_dom_msgs
-      \}
-
-let s:lt_msg_ustr = {
-      \  'desc': "Untranslated string"
-      \, 'pattern': '^\s*msgid\s\+\"\(.*\)"\s*$'
-      \, 'domain': s:po_dom_msgs
-      \}
-
-let s:lt_msg_trstr = {
-      \  'desc': "Translated string"
-      \, 'pattern': '^\s*msgstr\s\+\"\(.*\)"\s*$'
-      \, 'domain': s:po_dom_msgs
-      \}
-
-let s:lt_msg_cont = {
-      \  'desc': "Continuation line of -> "
-      \, 'pattern': '^\s*".*"\s*$'
-      \, 'domain': s:po_dom_msgs
-      \, 'could_be': [ s:lt_msg_ctxt, s:lt_msg_ustr, s:lt_msg_trstr ]
-      \}
-
-" }}}
-
-" }}}
-
-" Line type identification: {{{
-let s:line_types = [
-      \  s:lt_pre_cmt
-      \, s:lt_hd_prid
+let s:lt_hds = [
+      \  s:lt_hd_prid
       \, s:lt_hd_potdate
       \, s:lt_hd_porevdate
       \, s:lt_hd_last_tr
@@ -327,7 +241,77 @@ let s:line_types = [
       \, s:lt_hd_tenc
       \, s:lt_hd_xgen
       \, s:lt_hd_plurf
-      \, s:lt_msg_tr_cmt
+      \]
+
+for lt_hd in s:lt_hds
+  let lt_hd.domain = s:po_dom_head
+endfor
+
+" }}}
+
+" Message entry line type definitions: {{{
+
+" TODO : add compendium duplicated entries support.
+
+let s:lt_msg_tr_cmt = {
+      \  'desc': "Translator comment"
+      \, 'pattern': '\m^\s*#\s\+.*$'
+      \}
+
+let s:lt_msg_xt_cmt = {
+      \  'desc': "Extracted comment"
+      \, 'pattern': '^\s*#\.\s\+\(.*\)$'
+      \}
+
+let s:lt_msg_ref = {
+      \  'desc': "Reference"
+      \, 'pattern': '^\s*#:\s\+\(.*\)$'
+      \}
+
+let s:lt_msg_flags = {
+      \  'desc': "Flags"
+      \, 'pattern': '^\s*#\(,\s\+\(.*\)\)\+$'
+      \}
+
+let s:lt_msg_prv_ctxt = {
+      \  'desc': "Previous context"
+      \, 'pattern': '^\s*#|\s\+msgctxt\s\+\"\(.*\)"\s*$'
+      \}
+
+let s:lt_msg_prv_us = {
+      \  'desc': "Previous untranslated string"
+      \, 'pattern': '^\s*#|\s\+msgid\s\+\"\(.*\)"\s*$'
+      \}
+
+let s:lt_msg_prv_cont = {
+      \  'desc': "Continuation line of -> "
+      \, 'pattern': '^\s*#|\s\+"\(.*\)"\s*$'
+      \, 'could_be': [ s:lt_msg_prv_ctxt, s:lt_msg_prv_us ]
+      \}
+
+let s:lt_msg_ctxt = {
+      \  'desc': "Message context"
+      \, 'pattern': '^\s*msgctxt\s\+\"\(.*\)"\s*$'
+      \}
+
+let s:lt_msg_ustr = {
+      \  'desc': "Untranslated string"
+      \, 'pattern': '^\s*msgid\s\+\"\(.*\)"\s*$'
+      \}
+
+let s:lt_msg_trstr = {
+      \  'desc': "Translated string"
+      \, 'pattern': '^\s*msgstr\s\+\"\(.*\)"\s*$'
+      \}
+
+let s:lt_msg_cont = {
+      \  'desc': "Continuation line of -> "
+      \, 'pattern': '^\s*".*"\s*$'
+      \, 'could_be': [ s:lt_msg_ctxt, s:lt_msg_ustr, s:lt_msg_trstr ]
+      \}
+
+let s:lt_msgs = [
+      \  s:lt_msg_tr_cmt
       \, s:lt_msg_tr_cmt
       \, s:lt_msg_xt_cmt
       \, s:lt_msg_ref
@@ -338,6 +322,18 @@ let s:line_types = [
       \, s:lt_msg_ustr
       \, s:lt_msg_trstr
       \]
+
+for lt_msg in s:lt_msgs
+  let lt_msg.domain = s:po_dom_msgs
+endfor
+
+" }}}
+
+" }}}
+
+" Line type identification: {{{
+
+let s:line_types = s:lt_pres + s:lt_hds + s:lt_msgs
 
 let s:lt_funcs = {}
 
@@ -386,6 +382,5 @@ function! Clean_psh()
 endfunction
 
 " }}}
-
 
 " { vim: set foldmethod=marker : zM }

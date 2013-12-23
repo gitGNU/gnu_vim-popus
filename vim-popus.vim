@@ -83,15 +83,15 @@ let s:po_dom_msgs = {
       \, 'last'  : { 'number': line('$') }
       \}
 
-let s:sorted_domains = [ s:po_dom_pre, s:po_dom_head, s:po_dom_msgs ]
+let s:po_dom_fnc = {}
 
-function! Get_po_doms_tmp()
+function! s:po_dom_fnc.get_snap()
   let saved_cursor = getpos('.')
   let search_flags = 'cW'
 
   let lpre = deepcopy(s:po_dom_pre)
-  call cursor(lpre.first.number, 1)
-  let lpre.last.number = search('\m' . s:po_dom_pre.last.pattern, search_flags)
+  call cursor(1, 1)
+  let lpre.last.number = search('\m' . lpre.last.pattern, search_flags)
 
   let lhea = deepcopy(s:po_dom_head)
   let lhea.first.number = lpre.last.number + 1
@@ -107,15 +107,15 @@ function! Get_po_doms_tmp()
   return [ lpre, lhea, lmsg ]
 endfunction
 
-function! Get_po_dom_on_line(line_number)
-  let doms = Get_po_doms_tmp()
-  for dom in doms
+function! s:po_dom_fnc.which_dom(line_number)
+  for dom in s:po_dom_fnc.get_snap()
     if a:line_number >= dom.first.number
       if a:line_number <= dom.last.number
         return dom
       endif
     endif
   endfor
+  return {}
 endfunction
 
 " }}}
@@ -212,7 +212,6 @@ let s:lt_hd_plurf = {
 let s:lt_header_entry_cont = {
       \  'desc': "Continuation line of header entry -> "
       \, 'pattern': '^\s*"\(.*\)\\n"\s*$'
-      \, 'patt_props': { 'def_self':'true' }
       \}
 
 let s:lt_hds = [
@@ -321,21 +320,22 @@ endfor
 
 let s:line_types = s:lt_pres + s:lt_hds + s:lt_msgs
 
-let s:lt_funcs = {}
+let s:lt_fnc = {}
 
-function! s:lt_funcs.match_me(line_number)
+function! s:lt_fnc.match_me(line_number)
   if match(getline(a:line_number), self.pattern) == -1
     return {}
+  else
+    return self
   endif
-  return self
 endfunction
 
 for lt in s:line_types
-  let lt.match_me = s:lt_funcs.match_me
+  let lt.match_me = s:lt_fnc.match_me
 endfor
 
 function! Get_line_type(line_number)
-  let dom = Get_po_dom_on_line(a:line_number)
+  let dom = s:po_dom_fnc.which_dom(a:line_number)
   let list = filter(copy(s:line_types), "v:val.domain.name =~# dom.name")
   for lt in list
     if !empty(lt.match_me(a:line_number))

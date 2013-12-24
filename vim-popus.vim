@@ -53,72 +53,18 @@
 " }}}
 
 " PO files parsing {{{
-
-" Domains: {{{
-" A PO file is composed of 3 "domains" :
-" 1. preamble comments (optional)
-"    followed by
-" 2. header entries
-"    followed by
-" 3. messages.
-" To help disambiguation when a line type can not be identified without
-" context information, we define those 3 domains and related functions.
-
-let s:po_dom_pre = {
-      \  'name' : "preamble_comment_domain"
-      \, 'first': { 'number': 0 }
-      \, 'last' : { 'pattern': '\n\_^\s*msgid\s\+""\s*\(\n\s*\)*\_^*\s*msgstr\s\+""\s*$' }
-      \, 'comment': "This domain could be empty (get_line would return 0 for first and last)"
-      \}
-
-let s:po_dom_head = {
-      \  'name'  : "header_domain"
-      \, 'first' : { 'info': "s:po_dom_pre.last.number + 1" }
-      \, 'last'  : { 'pattern': '\n\_^\s*\(#\|msgid\s\+".*"\).*$' }
-      \}
-
-let s:po_dom_msgs = {
-      \  'name'  : "messages_domain"
-      \, 'first' : { 'info': "s:po_dom_head.last.number + 1" }
-      \, 'last'  : { 'number': line('$') }
-      \}
-
-let s:po_dom_fnc = {}
-
-function! s:po_dom_fnc.get_snap()
-  let saved_cursor = getpos('.')
-  let search_flags = 'cW'
-
-  let lpre = deepcopy(s:po_dom_pre)
-  call cursor(1, 1)
-  let lpre.last.number = search('\m' . lpre.last.pattern, search_flags)
-
-  let lhea = deepcopy(s:po_dom_head)
-  let lhea.first.number = lpre.last.number + 1
-  call cursor(lhea.first.number, 1)
-  let lhea.last.number = search('\m' . lhea.last.pattern, search_flags)
-
-  let lmsg = deepcopy(s:po_dom_msgs)
-  let lmsg.first.number = lhea.last.number + 1
-  call cursor(lmsg.first.number, 1)
-
-  call cursor(saved_cursor[1], saved_cursor[2])
-
-  return [ lpre, lhea, lmsg ]
-endfunction
-
-function! s:po_dom_fnc.which_dom(line_number)
-  for dom in s:po_dom_fnc.get_snap()
-    if a:line_number >= dom.first.number
-      if a:line_number <= dom.last.number
-        return dom
-      endif
-    endif
-  endfor
-  return {}
-endfunction
-
-" }}}
+" Everything is message, including headers which is the only type of message
+" which can and must be started ('#' comments appart) with an empty msgid.
+" Basically, has the form :
+"   # comment line (0 or more)
+"   msgid ""
+"   ...continued
+"   msgstr ""
+"   ...continued
+"
+"   ->next message
+"
+" WARNING: Does not accept msgid+msgstr on same line (msgcat does).
 
 " Type idenfication line-wise: {{{
 
@@ -126,27 +72,12 @@ endfunction
 
 " Misc entries line type definitions: {{{
 
-let s:lt_pre_cmt = {
-      \  'desc': "Preamble comment"
-      \, 'pattern': '\m\(^\(\s*#.*\)\s*$\)'
+let s:lt_cmt_gen = {
+      \  'desc': "Comment"
+      \, 'pattern': '\m^\s*#.*$'
       \}
 
-" Just init 's:tr_cmt' here because of cross-ref with 's:cmt'. Realy defined later.
-let s:lt_msg_tr_cmt = {}
-
-" A line matching '^\s*#\(\s\+.\+\)*$' could be of 's:tr_cmt' or 's:pre_cmt' type.
-let s:lt_mlt_cmt = {
-      \  'desc': "Comment -> "
-      \, 'pattern': '^\s*#\(\s\+.\+\)*$'
-      \, 'patt_props': { 'def_self':'true' }
-      \, 'could_be': [ s:lt_pre_cmt, s:lt_msg_tr_cmt ]
-      \}
-
-let s:lt_pres = [ s:lt_pre_cmt ]
-
-for lt_pre in s:lt_pres
-  let lt_pre.domain = s:po_dom_pre
-endfor
+let s:lt_pres = [ s:lt_cmt_gen ]
 
 "}}}
 
@@ -156,62 +87,62 @@ endfor
 
 let s:lt_hd_prid = {
       \  'desc': "Project-Id-Version"
-      \, 'pattern': '^\s*"Project-Id-Version\s*:\s*\(.*\)\s*"$'
+      \, 'pattern': '\m\C^\s*"Project-Id-Version\s*:\s*\(.*\)\s*"$'
       \}
 
 let s:lt_hd_potdate = {
       \  'desc': "POT-Creation-Date"
-      \, 'pattern': '^\s*"POT-Creation-Date\s*:\s*\(.*\)\s*"$'
+      \, 'pattern': '\m\C^\s*"POT-Creation-Date\s*:\s*\(.*\)\s*"$'
       \}
 
 let s:lt_hd_porevdate = {
       \  'desc': "PO-Revision-Date"
-      \, 'pattern': '^\s*"PO-Revision-Date\s*:\s*\(.*\)\s*"$'
+      \, 'pattern': '\m\C^\s*"PO-Revision-Date\s*:\s*\(.*\)\s*"$'
       \}
 
 let s:lt_hd_last_tr = {
       \  'desc': "Last-Translator"
-      \, 'pattern': '^\s*"Last-Translator\s*:\s*\(.*\)\s*"$'
+      \, 'pattern': '\m\C^\s*"Last-Translator\s*:\s*\(.*\)\s*"$'
       \}
 
 let s:lt_hd_lang_team = {
       \  'desc': "Language-Team"
-      \, 'pattern': '^\s*"Language-Team\s*:\s*\(.*\)\s*"$'
+      \, 'pattern': '\m\C^\s*"Language-Team\s*:\s*\(.*\)\s*"$'
       \}
 
 let s:lt_hd_language = {
       \  'desc': "Language"
-      \, 'pattern': '^\s*"Language\s*:\s*\(.*\)\s*"$'
+      \, 'pattern': '\m\C^\s*"Language\s*:\s*\(.*\)\s*"$'
       \}
 
 let s:lt_hd_mimev = {
       \  'desc': "MIME-Version"
-      \, 'pattern': '^\s*"MIME-Version\s*:\s*\(.*\)\s*"$'
+      \, 'pattern': '\m\C^\s*"MIME-Version\s*:\s*\(.*\)\s*"$'
       \}
 
 let s:lt_hd_ctype = {
       \  'desc': "Content-Type"
-      \, 'pattern': '^\s*"Content-Type\s*:\s*\(.*\)\s*"$'
+      \, 'pattern': '\m\C^\s*"Content-Type\s*:\s*\(.*\)\s*"$'
       \}
 
 let s:lt_hd_tenc = {
       \  'desc': "Content-Transfer-Encoding"
-      \, 'pattern': '^\s*"Content-Transfer-Encoding\s*:\s*\(.*\)\s*"$'
+      \, 'pattern': '\m\C^\s*"Content-Transfer-Encoding\s*:\s*\(.*\)\s*"$'
       \}
 
 let s:lt_hd_xgen = {
       \  'desc': "X-Generator"
-      \, 'pattern': '^\s*"X-Generator\s*:\s*\(.*\)\s*"$'
+      \, 'pattern': '\m\C^\s*"X-Generator\s*:\s*\(.*\)\s*"$'
       \}
 
 let s:lt_hd_plurf = {
       \  'desc': "Plural-Forms"
-      \, 'pattern': '^\s*"Plural-Forms\s*:\s*\(.*\)\s*"$'
+      \, 'pattern': '\m\C^\s*"Plural-Forms\s*:\s*\(.*\)\s*"$'
       \}
 
 let s:lt_header_entry_cont = {
       \  'desc': "Continuation line of header entry -> "
-      \, 'pattern': '^\s*"\(.*\)\\n"\s*$'
+      \, 'pattern': '\m\C^\s*"\(.*\)\\n"\s*$'
       \}
 
 let s:lt_hds = [
@@ -228,10 +159,6 @@ let s:lt_hds = [
       \, s:lt_hd_plurf
       \]
 
-for lt_hd in s:lt_hds
-  let lt_hd.domain = s:po_dom_head
-endfor
-
 " }}}
 
 " Message entry line type definitions: {{{
@@ -245,53 +172,53 @@ let s:lt_msg_tr_cmt = {
 
 let s:lt_msg_xt_cmt = {
       \  'desc': "Extracted comment"
-      \, 'pattern': '^\s*#\.\s\+\(.*\)$'
+      \, 'pattern': '\m\C^\s*#\.\s\+\(.*\)$'
       \}
 
 let s:lt_msg_ref = {
       \  'desc': "Reference"
-      \, 'pattern': '^\s*#:\s\+\(.*\)$'
+      \, 'pattern': '\m\C^\s*#:\s\+\(.*\)$'
       \}
 
 let s:lt_msg_flags = {
       \  'desc': "Flags"
-      \, 'pattern': '^\s*#\(,\s\+\(.*\)\)\+$'
+      \, 'pattern': '\m\C^\s*#\(,\s\+\(.*\)\)\+$'
       \}
 
 let s:lt_msg_prv_ctxt = {
       \  'desc': "Previous context"
-      \, 'pattern': '^\s*#|\s\+msgctxt\s\+\"\(.*\)"\s*$'
+      \, 'pattern': '\m\C^\s*#|\s\+msgctxt\s\+\"\(.*\)"\s*$'
       \}
 
 let s:lt_msg_prv_us = {
       \  'desc': "Previous untranslated string"
-      \, 'pattern': '^\s*#|\s\+msgid\s\+\"\(.*\)"\s*$'
+      \, 'pattern': '\m\C^\s*#|\s\+msgid\s\+\"\(.*\)"\s*$'
       \}
 
 let s:lt_msg_prv_cont = {
       \  'desc': "Continuation line of -> "
-      \, 'pattern': '^\s*#|\s\+"\(.*\)"\s*$'
+      \, 'pattern': '\m\C^\s*#|\s\+"\(.*\)"\s*$'
       \, 'could_be': [ s:lt_msg_prv_ctxt, s:lt_msg_prv_us ]
       \}
 
 let s:lt_msg_ctxt = {
       \  'desc': "Message context"
-      \, 'pattern': '^\s*msgctxt\s\+\"\(.*\)"\s*$'
+      \, 'pattern': '\m\C^\s*msgctxt\s\+\"\(.*\)"\s*$'
       \}
 
 let s:lt_msg_ustr = {
       \  'desc': "Untranslated string"
-      \, 'pattern': '^\s*msgid\s\+\"\(.*\)"\s*$'
+      \, 'pattern': '\m\C^\s*msgid\s\+"'
       \}
 
 let s:lt_msg_trstr = {
       \  'desc': "Translated string"
-      \, 'pattern': '^\s*msgstr\s\+\"\(.*\)"\s*$'
+      \, 'pattern': '\m\C^\s*msgstr\s\+\"\(.*\)"\s*$'
       \}
 
 let s:lt_msg_cont = {
       \  'desc': "Continuation line of -> "
-      \, 'pattern': '^\s*".*"\s*$'
+      \, 'pattern': '\m\C^\s*".*"\s*$'
       \, 'could_be': [ s:lt_msg_ctxt, s:lt_msg_ustr, s:lt_msg_trstr ]
       \}
 
@@ -307,10 +234,6 @@ let s:lt_msgs = [
       \, s:lt_msg_ustr
       \, s:lt_msg_trstr
       \]
-
-for lt_msg in s:lt_msgs
-  let lt_msg.domain = s:po_dom_msgs
-endfor
 
 " }}}
 
@@ -335,17 +258,76 @@ for lt in s:line_types
 endfor
 
 function! Get_line_type(line_number)
-  let dom = s:po_dom_fnc.which_dom(a:line_number)
-  let list = filter(copy(s:line_types), "v:val.domain.name =~# dom.name")
-  for lt in list
-    if !empty(lt.match_me(a:line_number))
-      return lt
-    endif
-  endfor
-  return {}
 endfunction
 
 " }}}
+
+let s:msg_fcn = {}
+
+function! s:msg_fcn.msgid_line_number()
+  let w_line = prevnonblank(line('.'))
+  let search_flags = 'cWn'
+  if w_line != 0 && match(getline(w_line), s:lt_cmt_gen.pattern) == -1
+    let search_flags .= 'b'
+  endif
+  return search(s:lt_msg_ustr.pattern, search_flags)
+endfunction
+
+function! s:msg_fcn.msg_top_line()
+  let last_match = s:msg_fcn.msgid_line_number()
+  let run_line = prevnonblank(last_match - 1)
+  while run_line != 0 && match(getline(run_line), s:lt_cmt_gen.pattern) != -1
+    let last_match = run_line
+    let run_line = prevnonblank(run_line - 1)
+  endwhile
+  return last_match
+endfunction
+
+function! s:msg_fcn.msg_bottom_line()
+  let last_match = s:msg_fcn.msgid_line_number()
+  let run_line = nextnonblank(last_match + 1)
+  let pattern = '\m\%(' . s:lt_cmt_gen.pattern . '\)\|\%(' . s:lt_msg_ustr.pattern . '\)'
+  let last_file_line = line('$')
+  while run_line != last_file_line && match(getline(run_line), pattern) == -1
+    let last_match = run_line
+    let run_line = nextnonblank(run_line + 1)
+  endwhile
+  return last_match
+endfunction
+
+function! s:msg_fcn.msg_search_bounds(above_or_below, pattern_limit, pattern_true_or_false)
+endfunction
+
+let s:new_lt_msg_ustr = {
+      \  'desc': "Untranslated string"
+      \, 'loose_pattern': '\m\C^\s*msgid\s\+"'
+      \, 'strict_pattern': ''
+      \, 'limits_from_self': []
+            \  { 'what': 'msg'
+                  \, { 'dir': 'above', 'pattern': '', 'match': 'true/false' }
+                  \, { 'dir': 'below', 'pattern': '', 'match': 'true/false' }
+                  \}
+            \, { 'what': 'self'
+                  \, { 'dir': 'above', 'pattern': '', 'match': 'true/false' }
+                  \, { 'dir': 'below', 'pattern': '', 'match': 'true/false' }
+                  \}
+            \}
+      \]
+
+let s:new_lt_msg_ustr.
+
+let s:new_lt_msg_ustr.limits.what[
+
+function! s:msg_fcn.box_me()
+  return {
+        \  'first_line': s:msg_fcn.msg_top_line()
+        \, 'last_line' : s:msg_fcn.msg_bottom_line()
+        \}
+endfunction
+
+function! MTempo()
+  return s:msg_fcn.box_me()
+endfunction
 
 " }}}
 
@@ -365,6 +347,14 @@ endfunction
 function! Clean_psh()
   let @/=""
   call histdel("/", -1)
+endfunction
+
+let s:misc_fcn = {}
+
+function! s:misc_fcn.restore_cursor(getpos_formated_list)
+  let poslist = copy(a:getpos_formated_list)
+  call remove(poslist, 0)
+  call cursor(poslist)
 endfunction
 
 " }}}

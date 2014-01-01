@@ -1,90 +1,320 @@
-" ***********************************************************************
-" Copyright (C) 2013 Alexandre Hoïde <alexandre.hoide@gmail.com>        "
-"                                                                       "
-" This program is free software: you can redistribute it and/or modify  "
-" it under the terms of the GNU General Public License as published by  "
-" the Free Software Foundation, either version 3 of the License, or     "
-" (at your option) any later version.                                   "
-"                                                                       "
-" This program is distributed in the hope that it will be useful,       "
-" but WITHOUT ANY WARRANTY; without even the implied warranty of        "
-" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         "
-" GNU General Public License for more details.                          "
-"                                                                       "
-" You should have received a copy of the GNU General Public License     "
-" along with this program.  If not, see <http://www.gnu.org/licenses/>. "
-" ***********************************************************************
-
-" Informations for translators/users: {{{
+" ----------------------------------------------------------------------
+" Copyright (C) 2013 Alexandre Hoïde <alexandre.hoide@gmail.com>
 "
-" DESCRIPTION:  This Vim plugin provides PO files translators with a convenient
-" message centric view. The initial intent was just to highlight differences
-" between a "previous-untranslated-string" and the corresponding new
-" "untranslated-string" msgid, and it ends up with a set a functionnalities
-" and views which allow for a full PO translation workflow.
+" This program is free software: you can redistribute it and/or modify
+" it under the terms of the GNU General Public License as published by
+" the Free Software Foundation, either version 3 of the License, or
+" (at your option) any later version.
 "
-" INSTALLATION: just put this in ~/.vim/ftplugin and make sure you have the
-" following in your ~/.vimrc
-" .. TODO
+" This program is distributed in the hope that it will be useful,
+" but WITHOUT ANY WARRANTY; without even the implied warranty of
+" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+" GNU General Public License for more details.
 "
-" UNINSTALLATION: just remove this file from ~/.vim/ftplugin.
-"   
-" USAGE: TODO
+" You should have received a copy of the GNU General Public License
+" along with this program.  If not, see <http://www.gnu.org/licenses/>.
 "
-" CONFIGURATION: There are a few items you should add in your ~/.vimrc for this
-" plugin to automatically update some PO header's entries, namely:
-" PO-Revision-Date, Last-Translator, Language-Team.
-" TODO
-" See below for shortcut customization.
+" ----------------------------------------------------------------------
+"     Script: vim-popus.vim
+"  Hosted At: http://savannah.nongnu.org/projects/vim-popus
+"   ___________________          \ /
+"  | $ post_tenebras ↲ |       -- * --
+"  | GNU               |       . / \
+"  | $ who ↲           |     o/
+"  | Alexandre Hoïde   |_-- ~|
+"   -------------------     / \
+"       Date:	Dec 20, 2013
+" Installing: TODO	:help vim-popus-install
+"      Usage:	TODO :help vim-popus
 "
-" SHORTCUTS: TODO
-
-" }}}
-
-" Informations about this plugin developpment {{{
-
-" For PO files specifications, I referred to: {{{
-" $ info gettext 'po files'
-" $ …            'header entry'
-" $ …            'creating compendia'
-" $ …            'translating plural forms'
-" }}}
-
-" }}}
-
-" PO files parsing {{{
-" Everything is message, including headers which is the only type of message
-" which can and must be started ('#' comments appart) with an empty msgid.
-" Basically, has the form :
-"   # comment line (0 or more)
-"   msgid ""
-"   ...continued
-"   msgstr ""
-"   ...continued
+" ---------------------------------------------------------------------
+" Constructors: {{{1
 "
-"   ->next message
+function! s:ltCons(desc, name, pattern, ...)
+  let ltObj = {}
+  let ltObj.desc    = a:desc
+  let ltObj.name    = a:name
+  let ltObj.pattern = a:pattern
+  let ltObj.concatenated_pattern = ''
+  let ltObj.concatenated_name    = ''
+  let ltObj.recursiveConcatenation = s:ltConsFunc.recursiveConcatenation
+  let ltObj.recursiveMatch         = s:ltConsFunc.recursiveMatch
+  return ltObj
+endfunction
+
+" ----------------------------------------------------------------------
+"  Functions: {{{1
 "
-" WARNING: Does not accept msgid+msgstr on same line (msgcat does).
+"  Line Types Functions: {{{2
+let s:ltConsFunc = {}
 
-" Type idenfication line-wise: {{{
+function! s:ltConsFunc.recursiveConcatenation(faKey)
+  if a:faKey !~# '^\(pattern\|name\)$'
+    return 0
+  endif
+  let concatenated_key = 'concatenated_' . a:faKey
+  if empty(self[concatenated_key])
+    let self[concatenated_key] = self[a:faKey]
+  endif
+  for key in keys(self)
+    if type(self[key]) == 4 && has_key(self[key], a:faKey)
+      if empty(self[key][concatenated_key])
+        let self[key][concatenated_key] = self[concatenated_key] . self[key][a:faKey]
+      endif
+      call self[key].recursiveConcatenation(a:faKey)
+    endif
+  endfor
+endfunction
 
-" Line types definitions: {{{
+function! s:ltConsFunc.recursiveMatch(...)
+  if a:0 == 2
+    let last_match = a:1
+    let wline = a:2
+  else
+    let last_match = 'NO-MATCH!'
+    let wline = getline(prevnonblank('.'))
+  endif
+  for key in keys(self)
+    if type(self[key]) == 4 && has_key(self[key], 'concatenated_pattern')
+      if match(wline, self[key].concatenated_pattern) != -1
+        return self[key].recursiveMatch(self[key].concatenated_name, wline)
+      endif
+    endif
+  endfor
+  return last_match
+endfunction
 
-" Misc entries line type definitions: {{{
+" ----------------------------------------------------------------------
+"  Message Functions: {{{2
+"
+let s:msgFunc = {}
 
-let s:lt_cmt_gen = {
-      \  'desc': "Comment"
-      \, 'pattern': '\m^\s*#.*$'
-      \}
+function! s:msgFunc.parseFlags(line_number)
+  let flag_list = split(getline(a:line_number), '#*,\s*')
+  let unknown_flags = []
+  let valid_flags = []
+  for flag in flag_list
+    if index(s:po_flags, flag) == -1
+      call add(unknown_flags, flag)
+    else
+      call add(valid_flags, flag)
+    endif
+  endfor
+  if len(unknown_flags) > 0
+    echoerr 'Unknown PO message flags found: ' string(unknown_flags)
+  endif
+  return valid_flags
+endfunction
 
-let s:lt_pres = [ s:lt_cmt_gen ]
+" ----------------------------------------------------------------------
+"  Move Functions: {{{2
+"
+let s:msgMove = {}
 
-"}}}
+function! s:msgMove.goFuzzy(dir)
+  " TODO go previous message before searching previous.
+  if a:dir !~# '^\(next\|previous\)$'
+    return 0
+  endif
+  let search_flags = a:dir =~# 'next' ? 'W' : 'Wb'
+  let pattern = s:lt.cmt.flags.concatenated_pattern . '\zsfuzzy'
+  let line = search(pattern, search_flags)
+  if line == 0
+    echomsg 'No fuzzy message found ' a:dir == 'next' ? 'below ' : 'above ' 'line number ' line('.')
+  else
+    let pattern = s:lt.msg.str.concatenated_pattern
+    call search(pattern, 'W')
+    normal! z.$
+  endif
+endfunction
 
-" Header entry line type definitions: {{{
+function! s:msgMove.goMsg(dir, where)
+endfunction
 
-" TODO : complete header entries list
+" ----------------------------------------------------------------------
+" Line Types Def: {{{1
+"
+let s:lt = s:ltCons(
+      \  'line type root'
+      \, ''
+      \, '\m\C^\s*'
+      \)
 
+let s:lt.continuation = s:ltCons(
+      \  'continuation line'
+      \, 'Cont'
+      \, '\\\@<!".*\\\@<!"'
+      \)
+
+" ----------------------------------------------------------------------
+" Message: {{{2
+"
+let s:lt.msg = s:ltCons(
+      \  'Message base'
+      \, ''
+      \, 'msg'
+      \)
+
+let s:lt.msg.id = s:ltCons(
+      \  'Untranslated string base'
+      \, 'UNTRANSLATED-STRING'
+      \, 'id'
+      \)
+
+let s:lt.msg.id.singular = s:ltCons(
+      \  'UNTRANSLATED-STRING'
+      \, ''
+      \, '\s\+".*\\\@<!"\s*'
+      \)
+
+let s:lt.msg.id.plural = s:ltCons(
+      \  'UNTRANSLATED-STRING-PLURAL'
+      \, '-PLURAL'
+      \, '_plural\s\+".*\\\@<!"\s*'
+      \)
+
+let s:lt.msg.str = s:ltCons(
+      \  'Translated string base'
+      \, 'TRANSLATED-STRING'
+      \, 'str'
+      \)
+
+let s:lt.msg.str.single = s:ltCons(
+      \  'TRANSLATED-STRING'
+      \, ''
+      \, '\s\+".*\\\@<!"\s*'
+      \)
+
+let s:lt.msg.str.plural = s:ltCons(
+      \  'TRANSLATED-STRING-PLURAL'
+      \, '-PLURAL'
+      \, '\[\d]\s\+".*\\\@<!"\s*'
+      \)
+
+let s:lt.msg.ctxt = s:ltCons(
+      \  'CONTEXT'
+      \, 'CONTEXT'
+      \, 'ctxt\s\+".*\\\@<!"\s*'
+      \)
+
+" ----------------------------------------------------------------------
+" Comments: {{{2
+"
+let s:lt.cmt = s:ltCons(
+      \  'Comment base'
+      \, ''
+      \, '#'
+      \)
+
+let s:lt.cmt.translator = s:ltCons(
+      \  'TRANSLATOR-COMMENT'
+      \, 'TRANSLATOR-COMMENT'
+      \, '\s\+'
+      \)
+
+let s:lt.cmt.extracted = s:ltCons(
+      \  'EXTRACTED-COMMENT'
+      \, 'EXTRACTED-COMMENT'
+      \, '\.\s\+'
+      \)
+
+let s:lt.cmt.reference = s:ltCons(
+      \  'REFERENCE'
+      \, 'REFERENCE'
+      \, ':\s\+'
+      \)
+
+let s:lt.cmt.flags = s:ltCons(
+      \  'FLAGS'
+      \, 'FLAGS'
+      \, '\%(,\s\+\%(.*\)\)\+'
+      \)
+
+let s:lt.cmt.previous = s:ltCons(
+      \  'PREVIOUS'
+      \, 'PREVIOUS-'
+      \, '|\s\+'
+      \)
+
+let s:lt.cmt.obsolete = s:ltCons(
+      \  'OBSOLETE'
+      \, 'OBSOLETE'
+      \, '\v\~(:|,|\.|\|)*\s+'
+      \)
+
+let s:lt.cmt.previous.msg = deepcopy(s:lt.msg)
+let s:lt.cmt.previous.continuation = deepcopy(s:lt.continuation)
+
+" ----------------------------------------------------------------------
+" Update Tree: {{{2
+"
+call s:lt.recursiveConcatenation('pattern')
+call s:lt.recursiveConcatenation('name')
+
+" ----------------------------------------------------------------------
+"  PO Specs: {{{1 
+"
+let s:po_flags = [
+      \  'fuzzy'
+      \, 'no-wrap'
+      \, 'c-format'
+      \, 'no-c-format'
+      \, 'objc-format'
+      \, 'no-objc-format'
+      \, 'sh-format'
+      \, 'no-sh-format'
+      \, 'python-format'
+      \, 'no-python-format'
+      \, 'python-brace-format'
+      \, 'no-python-brace-format'
+      \, 'lisp-format'
+      \, 'no-lisp-format'
+      \, 'elisp-format'
+      \, 'no-elisp-format'
+      \, 'librep-format'
+      \, 'no-librep-format'
+      \, 'scheme-format'
+      \, 'no-scheme-format'
+      \, 'smalltalk-format'
+      \, 'no-smalltalk-format'
+      \, 'java-format'
+      \, 'no-java-format'
+      \, 'csharp-format'
+      \, 'no-csharp-format'
+      \, 'awk-format'
+      \, 'no-awk-format'
+      \, 'object-pascal-format'
+      \, 'no-object-pascal-format'
+      \, 'ycp-format'
+      \, 'no-ycp-format'
+      \, 'tcl-format'
+      \, 'no-tcl-format'
+      \, 'perl-format'
+      \, 'no-perl-format'
+      \, 'perl-brace-format'
+      \, 'no-perl-brace-format'
+      \, 'php-format'
+      \, 'no-php-format'
+      \, 'gcc-internal-format'
+      \, 'no-gcc-internal-format'
+      \, 'gfc-internal-format'
+      \, 'no-gfc-internal-format'
+      \, 'qt-format'
+      \, 'no-qt-format'
+      \, 'qt-plural-format'
+      \, 'no-qt-plural-format'
+      \, 'kde-format'
+      \, 'no-kde-format'
+      \, 'boost-format'
+      \, 'no-boost-format'
+      \, 'lua-format'
+      \, 'no-lua-format'
+      \, 'javascript-format'
+      \, 'no-javascript-format'
+      \]
+
+" Line Types Def OLD TODO: {{{1
+"
 let s:lt_hd_prid = {
       \  'desc': "Project-Id-Version"
       \, 'pattern': '\m\C^\s*"Project-Id-Version\s*:\s*\(.*\)\s*"$'
@@ -159,204 +389,21 @@ let s:lt_hds = [
       \, s:lt_hd_plurf
       \]
 
-" }}}
-
-" Message entry line type definitions: {{{
-
-" TODO : add compendium duplicated entries support.
-
-let s:lt_msg_tr_cmt = {
-      \  'desc': "Translator comment"
-      \, 'pattern': '\m^\s*#\s\+.*$'
-      \}
-
-let s:lt_msg_xt_cmt = {
-      \  'desc': "Extracted comment"
-      \, 'pattern': '\m\C^\s*#\.\s\+\(.*\)$'
-      \}
-
-let s:lt_msg_ref = {
-      \  'desc': "Reference"
-      \, 'pattern': '\m\C^\s*#:\s\+\(.*\)$'
-      \}
-
-let s:lt_msg_flags = {
-      \  'desc': "Flags"
-      \, 'pattern': '\m\C^\s*#\(,\s\+\(.*\)\)\+$'
-      \}
-
-let s:lt_msg_prv_ctxt = {
-      \  'desc': "Previous context"
-      \, 'pattern': '\m\C^\s*#|\s\+msgctxt\s\+\"\(.*\)"\s*$'
-      \}
-
-let s:lt_msg_prv_us = {
-      \  'desc': "Previous untranslated string"
-      \, 'pattern': '\m\C^\s*#|\s\+msgid\s\+\"\(.*\)"\s*$'
-      \}
-
-let s:lt_msg_prv_cont = {
-      \  'desc': "Continuation line of -> "
-      \, 'pattern': '\m\C^\s*#|\s\+"\(.*\)"\s*$'
-      \, 'could_be': [ s:lt_msg_prv_ctxt, s:lt_msg_prv_us ]
-      \}
-
-let s:lt_msg_ctxt = {
-      \  'desc': "Message context"
-      \, 'pattern': '\m\C^\s*msgctxt\s\+\"\(.*\)"\s*$'
-      \}
-
-let s:lt_msg_ustr = {
-      \  'desc': "Untranslated string"
-      \, 'pattern': '\m\C^\s*msgid\s\+"'
-      \}
-
-let s:lt_msg_trstr = {
-      \  'desc': "Translated string"
-      \, 'pattern': '\m\C^\s*msgstr\s\+\"\(.*\)"\s*$'
-      \}
-
-let s:lt_msg_cont = {
-      \  'desc': "Continuation line of -> "
-      \, 'pattern': '\m\C^\s*".*"\s*$'
-      \, 'could_be': [ s:lt_msg_ctxt, s:lt_msg_ustr, s:lt_msg_trstr ]
-      \}
-
-let s:lt_msgs = [
-      \  s:lt_msg_tr_cmt
-      \, s:lt_msg_tr_cmt
-      \, s:lt_msg_xt_cmt
-      \, s:lt_msg_ref
-      \, s:lt_msg_flags
-      \, s:lt_msg_prv_ctxt
-      \, s:lt_msg_prv_us
-      \, s:lt_msg_ctxt
-      \, s:lt_msg_ustr
-      \, s:lt_msg_trstr
-      \]
-
-" }}}
-
-" }}}
-
-" Line type identification: {{{
-
-let s:line_types = s:lt_pres + s:lt_hds + s:lt_msgs
-
-let s:lt_fnc = {}
-
-function! s:lt_fnc.match_me(line_number)
-  if match(getline(a:line_number), self.pattern) == -1
-    return {}
-  else
-    return self
-  endif
+" ----------------------------------------------------------------------
+" Debug: {{{1
+"
+function! MyEcho(obj)
+    echo s:{a:obj}
+endfunction
+function! MyUnlet(obj)
+    unlet s:{a:obj}
+endfunction
+function! MyLet(obj, value)
+    let s:{a:obj} = a:value
+endfunction
+function! MyReturn(obj)
+  let tempo = eval('s:' . a:obj)
+  return tempo
 endfunction
 
-for lt in s:line_types
-  let lt.match_me = s:lt_fnc.match_me
-endfor
-
-function! Get_line_type(line_number)
-endfunction
-
-" }}}
-
-let s:msg_fcn = {}
-
-function! s:msg_fcn.msgid_line_number()
-  let w_line = prevnonblank(line('.'))
-  let search_flags = 'cWn'
-  if w_line != 0 && match(getline(w_line), s:lt_cmt_gen.pattern) == -1
-    let search_flags .= 'b'
-  endif
-  return search(s:lt_msg_ustr.pattern, search_flags)
-endfunction
-
-function! s:msg_fcn.msg_top_line()
-  let last_match = s:msg_fcn.msgid_line_number()
-  let run_line = prevnonblank(last_match - 1)
-  while run_line != 0 && match(getline(run_line), s:lt_cmt_gen.pattern) != -1
-    let last_match = run_line
-    let run_line = prevnonblank(run_line - 1)
-  endwhile
-  return last_match
-endfunction
-
-function! s:msg_fcn.msg_bottom_line()
-  let last_match = s:msg_fcn.msgid_line_number()
-  let run_line = nextnonblank(last_match + 1)
-  let pattern = '\m\%(' . s:lt_cmt_gen.pattern . '\)\|\%(' . s:lt_msg_ustr.pattern . '\)'
-  let last_file_line = line('$')
-  while run_line != last_file_line && match(getline(run_line), pattern) == -1
-    let last_match = run_line
-    let run_line = nextnonblank(run_line + 1)
-  endwhile
-  return last_match
-endfunction
-
-function! s:msg_fcn.msg_search_bounds(above_or_below, pattern_limit, pattern_true_or_false)
-endfunction
-
-let s:new_lt_msg_ustr = {
-      \  'desc': "Untranslated string"
-      \, 'loose_pattern': '\m\C^\s*msgid\s\+"'
-      \, 'strict_pattern': ''
-      \, 'limits_from_self': []
-            \  { 'what': 'msg'
-                  \, { 'dir': 'above', 'pattern': '', 'match': 'true/false' }
-                  \, { 'dir': 'below', 'pattern': '', 'match': 'true/false' }
-                  \}
-            \, { 'what': 'self'
-                  \, { 'dir': 'above', 'pattern': '', 'match': 'true/false' }
-                  \, { 'dir': 'below', 'pattern': '', 'match': 'true/false' }
-                  \}
-            \}
-      \]
-
-let s:new_lt_msg_ustr.
-
-let s:new_lt_msg_ustr.limits.what[
-
-function! s:msg_fcn.box_me()
-  return {
-        \  'first_line': s:msg_fcn.msg_top_line()
-        \, 'last_line' : s:msg_fcn.msg_bottom_line()
-        \}
-endfunction
-
-function! MTempo()
-  return s:msg_fcn.box_me()
-endfunction
-
-" }}}
-
-" }}}
-
-" Misc functions: {{{
-
-function! Check_encoding_vs_header_declaration()
-  TODO
-endfunction
-
-function! Display_nbsp_as_dot()
-  autocmd Filetype po setlocal listchars=nbsp:· list
-endfunction
-
-" Call to clean last plugin search from history (to avoid trashing user history).
-function! Clean_psh()
-  let @/=""
-  call histdel("/", -1)
-endfunction
-
-let s:misc_fcn = {}
-
-function! s:misc_fcn.restore_cursor(getpos_formated_list)
-  let poslist = copy(a:getpos_formated_list)
-  call remove(poslist, 0)
-  call cursor(poslist)
-endfunction
-
-" }}}
-
-" { vim: set foldmethod=marker : zM }
+" vim: foldmethod=marker nowrap
